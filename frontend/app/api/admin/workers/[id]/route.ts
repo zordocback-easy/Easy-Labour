@@ -18,7 +18,7 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
         }
 
         const backendUrl =
-            process.env.BACKEND_URL?.replace(/\/$/, "") ||
+            process.env.BACKEND_URL ||
             "https://easy-labour.onrender.com"
 
         // ✅ In your setup, cookies() is typed async

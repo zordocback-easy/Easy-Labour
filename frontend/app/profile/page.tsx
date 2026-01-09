@@ -1,6 +1,5 @@
 ﻿import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth"
-import { getClientById } from "@/lib/database"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { PageBanner } from "@/components/page-banner"
@@ -16,7 +15,8 @@ export default async function ProfilePage() {
     redirect("/login")
   }
 
-  const client = getClientById(user.profileId)
+  // Client data is included in the user object from getCurrentUser
+  const client = user.client
 
   return (
     <>

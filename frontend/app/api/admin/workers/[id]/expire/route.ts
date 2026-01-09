@@ -18,11 +18,11 @@ export async function POST(request: Request, { params }: RouteContext) {
         }
 
         const backendUrl =
-            process.env.BACKEND_URL?.replace(/\/$/, "") ||
+            process.env.BACKEND_URL ||
             "https://easy-labour.onrender.com"
 
-        // ✅ cookies() is synchronous
-        const cookieStore = cookies()
+        // ✅ cookies() must be awaited in Next.js 16
+        const cookieStore = await cookies()
         const cookieHeader = cookieStore
             .getAll()
             .map((c) => `${c.name}=${c.value}`)
