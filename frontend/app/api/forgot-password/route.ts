@@ -1,8 +1,8 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
     try {
-        const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com";
+        const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com";
         const body = await req.json();
 
         console.log(`[PROXY] Sending to ${backendUrl}/api/forgot-password:`, body);

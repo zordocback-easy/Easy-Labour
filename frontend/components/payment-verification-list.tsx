@@ -46,7 +46,7 @@ export function PaymentVerificationList({ workers }: PaymentVerificationListProp
   const getImageUrl = (path: string | undefined, type: 'profile' | 'payment') => {
     if (!path) return "/placeholder.svg"
     if (path.startsWith('http')) return path
-    const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "https://easy-labour.onrender.com"
     const folder = type === 'profile' ? 'workers' : 'payments'
     return path.startsWith('/') ? `${backend}${path}` : `${backend}/uploads/${folder}/${path}`
   }

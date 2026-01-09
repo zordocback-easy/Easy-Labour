@@ -1,4 +1,4 @@
-﻿
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Users, UserCheck, UserX, TrendingUp, MessageSquare, ArrowUpRight, Activity } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 
 async function fetchUnverifiedWorkers() {
   try {
-    const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
     const { cookies } = await import("next/headers")
     const cookieStore = await cookies()
     const cookieHeader = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join("; ")
@@ -26,7 +26,7 @@ async function fetchUnverifiedWorkers() {
 
 async function fetchPendingPaymentWorkers() {
   try {
-    const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
     const { cookies } = await import("next/headers")
     const cookieStore = await cookies()
     const cookieHeader = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join("; ")
@@ -46,7 +46,7 @@ async function fetchPendingPaymentWorkers() {
 
 async function fetchAllWorkers() {
   try {
-    const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
     const res = await fetch(`${backendUrl}/api/workers`, {
       method: "GET",
       cache: "no-store",
@@ -61,7 +61,7 @@ async function fetchAllWorkers() {
 
 async function fetchClientCount() {
   try {
-    const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
     const { cookies } = await import("next/headers")
     const cookieStore = await cookies()
     const cookieHeader = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join("; ")
@@ -81,7 +81,7 @@ async function fetchClientCount() {
 
 async function fetchSupportMessages() {
   try {
-    const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
     const { cookies } = await import("next/headers")
     const cookieStore = await cookies()
     const cookieHeader = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join("; ")

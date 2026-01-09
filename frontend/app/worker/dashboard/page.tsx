@@ -58,7 +58,7 @@ export default async function WorkerDashboard() {
   const daysUntilExpiry = getDaysUntilExpiry(worker)
 
   // Determine profile image URL
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://easy-labour.onrender.com"
   const profileImageUrl = worker.profileImage
     ? (worker.profileImage.startsWith("http") ? worker.profileImage : `${backendUrl}/uploads/workers/${worker.profileImage}`)
     : ""

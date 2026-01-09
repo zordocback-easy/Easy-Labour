@@ -5,7 +5,7 @@ export const runtime = "nodejs"
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
     const id = params.id
 
     console.log('Proxy GET /api/workers/:id/reviews', { id })
@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
     const id = params.id
 
     const cookieStore = await cookies()

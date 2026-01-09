@@ -55,7 +55,7 @@ export function WorkersOverview({ workers }: { workers: Worker[] }) {
   const getImageUrl = (path: string | undefined) => {
     if (!path) return "/placeholder.svg"
     if (path.startsWith('http')) return path
-    const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "https://easy-labour.onrender.com"
     return path.startsWith('/') ? `${backend}${path}` : `${backend}/uploads/workers/${path}`
   }
 

@@ -1,21 +1,21 @@
-﻿import { NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
 export const runtime = "nodejs"
 
 export async function POST(request: Request) {
   try {
-    const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
 
-    // âœ… Your frontend now sends FormData (CNIC + profile image), so we read formData here
+    // ✅ Your frontend now sends FormData (CNIC + profile image), so we read formData here
     const formData = await request.formData()
 
-    // âœ… Get cookies from the request
+    // ✅ Get cookies from the request
     const cookieStore = await cookies()
     const allCookies = cookieStore.getAll()
     const cookieHeader = allCookies.map((c) => `${c.name}=${c.value}`).join("; ")
 
-    // âœ… Forward to Express backend with cookies
+    // ✅ Forward to Express backend with cookies
     const res = await fetch(`${backendUrl}/api/register-worker`, {
       method: "POST",
       headers: {

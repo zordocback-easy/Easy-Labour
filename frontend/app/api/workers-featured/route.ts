@@ -1,10 +1,10 @@
-﻿import { NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
 export const runtime = "nodejs"
 
 export async function GET(request: Request) {
   try {
-    const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
     const { searchParams } = new URL(request.url)
     const limit = searchParams.get("limit") || "6"
 

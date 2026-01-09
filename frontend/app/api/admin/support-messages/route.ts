@@ -1,9 +1,9 @@
-﻿import { NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
 export async function GET() {
     try {
-        const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+        const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
 
         // Forward cookies for authentication
         const cookieStore = await cookies()
@@ -27,7 +27,7 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
     try {
-        const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+        const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
         const { id, status } = await req.json()
 
         const cookieStore = await cookies()
@@ -51,7 +51,7 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
     try {
-        const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+        const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
         const { searchParams } = new URL(req.url)
         const id = searchParams.get("id")
 

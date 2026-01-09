@@ -3,7 +3,7 @@ import { WorkersOverview } from "@/components/workers-overview"
 
 async function fetchAllWorkers() {
     try {
-        const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+        const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
         const res = await fetch(`${backendUrl}/api/workers`, {
             method: "GET",
             cache: "no-store",

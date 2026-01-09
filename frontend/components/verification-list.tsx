@@ -57,7 +57,7 @@ export function VerificationList({ workers }: { workers: Worker[] }) {
     if (!path) return "/placeholder.svg"
     if (path.startsWith('http')) return path
     if (path.startsWith('data:')) return path
-    const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backend = process.env.NEXT_PUBLIC_BACKEND_URL || "https://easy-labour.onrender.com"
     return path.startsWith('/') ? `${backend}${path}` : `${backend}/uploads/workers/${path}`
   }
 

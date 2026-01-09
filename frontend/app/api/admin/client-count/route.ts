@@ -1,11 +1,11 @@
-﻿import { NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
 export const runtime = "nodejs"
 
 export async function GET(request: Request) {
     try {
-        const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+        const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
 
         const cookieStore = await cookies()
         const cookieHeader = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join("; ")

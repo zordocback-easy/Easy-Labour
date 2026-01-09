@@ -1,11 +1,11 @@
-﻿import { NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
 export const runtime = "nodejs"
 
 export async function POST() {
   try {
-    const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
 
     const cookieStore = await cookies()
     const cookieHeader = cookieStore
@@ -21,10 +21,10 @@ export async function POST() {
 
     const data = await res.json().catch(() => ({ success: true }))
 
-    // âœ… Create response
+    // ✅ Create response
     const response = NextResponse.json(data, { status: res.status })
 
-    // âœ… FORCE clear ALL cookies that exist on this domain
+    // ✅ FORCE clear ALL cookies that exist on this domain
     // (this guarantees logout works even if backend cookies aren't forwarded)
     const cookieName = process.env.COOKIE_NAME || 'easy_token';
     cookieStore.getAll().forEach((c) => {

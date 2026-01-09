@@ -1,6 +1,6 @@
 import { cookies } from "next/headers"
 
-const BACKEND_URL = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+const BACKEND_URL = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
 
 /**
  * Common data processing for worker objects received from backend

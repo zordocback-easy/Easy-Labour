@@ -11,7 +11,7 @@ interface GoogleAuthButtonProps {
 export function GoogleAuthButton({ mode, onSuccess, onError }: GoogleAuthButtonProps) {
     const handleGoogleAuth = () => {
         // Redirect to backend Google OAuth endpoint
-        const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://easy-backend-pkd1.onrender.com';
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://easy-labour.onrender.com';
         window.location.href = `${backendUrl}/api/auth/google`;
     };
 

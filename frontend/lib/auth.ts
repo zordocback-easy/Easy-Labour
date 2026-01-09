@@ -14,7 +14,7 @@ export async function logout() {
 
 export async function getCurrentUser() {
   try {
-    const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+    const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
     const cookieStore = await cookies()
     const cookieName = process.env.COOKIE_NAME || "easy_token"
     const token = cookieStore.get(cookieName)

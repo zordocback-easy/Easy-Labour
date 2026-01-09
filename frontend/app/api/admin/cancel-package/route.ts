@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
 export const runtime = "nodejs"
@@ -9,7 +9,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
     try {
-        const backendUrl = process.env.BACKEND_URL || "https://easy-backend-pkd1.onrender.com"
+        const backendUrl = process.env.BACKEND_URL || "https://easy-labour.onrender.com"
         const body = await request.text()
 
         // Forward cookies from the request
