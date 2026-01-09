@@ -257,35 +257,23 @@ const passport = require('../config/passport-config');
 router.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 // Google OAuth Callback
-router.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login?error=google_auth_failed' }),
-  async (req, res) => {
-    try {
-      // User is authenticated via Passport
-      const user = req.user;
 
-      // Generate JWT token
-      const token = signToken({ sub: user._id.toString(), role: user.role });
-      setAuthCookie(res, token);
 
-      // Redirect to frontend with success
-      // Redirect to frontend with success
-      const origins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(o => o.trim());
-      const requestHost = req.get('host');
+// in backend/src/routes/auth.js
 
-      // Favor a non-localhost URL and ensure it's not the backend itself
-      const frontendUrl = origins.find(o => !o.includes('localhost') && !o.includes(requestHost)) || origins[0];
+router.get("/auth/google/callback", (req, res, next) => {
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
-      console.log(`[GOOGLE AUTH] Redirecting to: ${frontendUrl}`);
-      res.redirect(`${frontendUrl}/?google_auth=success`);
-    } catch (err) {
-      console.error('[GOOGLE AUTH] Callback error:', err);
-      const origins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(o => o.trim());
-      const requestHost = req.get('host');
-      const frontendUrl = origins.find(o => !o.includes('localhost') && !o.includes(requestHost)) || origins[0];
-      res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
+  passport.authenticate("google", { session: false }, (err, user) => {
+    if (err || !user) {
+      return res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
     }
-  }
-);
+
+    const token = signToken({ sub: user._id.toString(), role: user.role });
+
+    // send token to frontend so frontend can set cookie on its own domain
+    return res.redirect(`${frontendUrl}/oauth/google?token=${encodeURIComponent(token)}`);
+  })(req, res, next);
+});
 
 module.exports = router;
