@@ -271,13 +271,18 @@ router.get('/auth/google/callback',
       // Redirect to frontend with success
       // Redirect to frontend with success
       const origins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(o => o.trim());
-      // Favor a non-localhost URL if multiple are present
-      const frontendUrl = origins.find(o => !o.includes('localhost')) || origins[0];
+      const requestHost = req.get('host');
+
+      // Favor a non-localhost URL and ensure it's not the backend itself
+      const frontendUrl = origins.find(o => !o.includes('localhost') && !o.includes(requestHost)) || origins[0];
+
+      console.log(`[GOOGLE AUTH] Redirecting to: ${frontendUrl}`);
       res.redirect(`${frontendUrl}/?google_auth=success`);
     } catch (err) {
       console.error('[GOOGLE AUTH] Callback error:', err);
       const origins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(o => o.trim());
-      const frontendUrl = origins.find(o => !o.includes('localhost')) || origins[0];
+      const requestHost = req.get('host');
+      const frontendUrl = origins.find(o => !o.includes('localhost') && !o.includes(requestHost)) || origins[0];
       res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
     }
   }
