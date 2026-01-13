@@ -1,10 +1,11 @@
 const express = require('express');
 const { z } = require('zod');
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Client = require('../models/Client');
 const Worker = require('../models/Worker');
 const { signToken, cookieOptions } = require('../utils/jwt');
-const sendEmail = require('../utils/email');
+const sendWhatsAppOTP = require('../utils/whatsapp');
 
 const router = express.Router();
 
@@ -144,7 +145,7 @@ router.post('/forgot-password', async (req, res, next) => {
     }
 
     console.log('[AUTH] Searching for user:', email.toLowerCase());
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: email.toLowerCase() }).populate('worker client');
 
     if (!user) {
       console.log('[AUTH] Error: User not found for email:', email);
@@ -153,45 +154,46 @@ router.post('/forgot-password', async (req, res, next) => {
 
     console.log('[AUTH] Generating OTP for user:', user._id);
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    const otpHash = await User.hashPassword(otp);
+    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-    user.resetPasswordOTP = otp;
+    // Rate limiting: check if last OTP was sent less than 1 minute ago
+    if (user.resetPasswordExpires && (user.resetPasswordExpires.getTime() - Date.now() > 4 * 60 * 1000)) {
+      return res.status(429).json({ success: false, error: 'Please wait before requesting another OTP' });
+    }
+
+    user.resetPasswordOTP = otpHash;
     user.resetPasswordExpires = otpExpiry;
 
-    console.log('[AUTH] Saving user with OTP...');
+    console.log('[AUTH] Saving user with hashed OTP...');
     await user.save();
     console.log('[AUTH] User saved successfully');
 
     try {
-      console.log('[AUTH] Attempting to send email...');
-      await sendEmail({
-        email: user.email,
-        subject: 'Your Password Reset OTP - Easy',
-        message: `Your OTP for password reset is: ${otp}. It will expire in 10 minutes.`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e1e1e1; border-radius: 10px;">
-            <h2 style="color: #4f46e5; text-align: center;">Password Reset Request</h2>
-            <p>Hello,</p>
-            <p>You requested to reset your password. Please use the following One-Time Password (OTP) to proceed:</p>
-            <div style="background-color: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; border-radius: 8px; margin: 20px 0;">
-              ${otp}
-            </div>
-            <p style="color: #6b7280; font-size: 14px;">This code will expire in 10 minutes. If you did not request this, please ignore this email.</p>
-            <hr style="border: 0; border-top: 1px solid #e1e1e1; margin: 20px 0;">
-            <p style="text-align: center; color: #9ca3af; font-size: 12px;">&copy; ${new Date().getFullYear()} Easy App. All rights reserved.</p>
-          </div>
-        `
-      });
-      console.log('[AUTH] Email sent successfully');
-      return res.json({ success: true, message: 'OTP sent to email' });
+      let phone = null;
+      if (user.role === 'worker' && user.worker) {
+        phone = user.worker.whatsapp || user.worker.phone;
+      } else if (user.role === 'client' && user.client) {
+        phone = user.client.phone;
+      }
+
+      if (!phone) {
+        console.log('[AUTH] Error: No phone number found for user:', user._id);
+        return res.status(400).json({ success: false, error: 'No phone number found for this account. Please contact support.' });
+      }
+
+      console.log('[AUTH] Attempting to send WhatsApp OTP to:', phone);
+      await sendWhatsAppOTP(phone, otp);
+      console.log('[AUTH] WhatsApp OTP sent successfully');
+      return res.json({ success: true, message: 'OTP sent to your WhatsApp' });
     } catch (err) {
-      console.error('[AUTH] Email send error:', err.message);
+      console.error('[AUTH] WhatsApp send error:', err.message);
       user.resetPasswordOTP = null;
       user.resetPasswordExpires = null;
       await user.save();
       return res.status(500).json({
         success: false,
-        error: 'Failed to send email. Please try again later.',
+        error: 'Failed to send OTP. Please try again later.',
         debugDetails: err.message
       });
     }
@@ -208,11 +210,15 @@ router.post('/verify-otp', async (req, res, next) => {
 
     const user = await User.findOne({
       email: email.toLowerCase(),
-      resetPasswordOTP: otp,
       resetPasswordExpires: { $gt: Date.now() }
     });
 
-    if (!user) {
+    if (!user || !user.resetPasswordOTP) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+    }
+
+    const isMatch = await bcrypt.compare(otp, user.resetPasswordOTP);
+    if (!isMatch) {
       return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
     }
 
@@ -230,11 +236,15 @@ router.post('/reset-password', async (req, res, next) => {
 
     const user = await User.findOne({
       email: email.toLowerCase(),
-      resetPasswordOTP: otp,
       resetPasswordExpires: { $gt: Date.now() }
     });
 
-    if (!user) {
+    if (!user || !user.resetPasswordOTP) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+    }
+
+    const isMatch = await bcrypt.compare(otp, user.resetPasswordOTP);
+    if (!isMatch) {
       return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
     }
 
