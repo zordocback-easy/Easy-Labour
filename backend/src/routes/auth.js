@@ -5,9 +5,18 @@ const User = require('../models/User');
 const Client = require('../models/Client');
 const Worker = require('../models/Worker');
 const { signToken, cookieOptions } = require('../utils/jwt');
-const sendWhatsAppOTP = require('../utils/whatsapp');
-
 const router = express.Router();
+const { sendResetOtpEmail } = require('../services/emailService');
+const crypto = require('crypto');
+
+// Rate limiter for forgot-password to prevent abuse (3 per hour per IP)
+const forgotPasswordLimiter = require('express-rate-limit')({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // Limit each IP to 3 requests per hour
+  message: { success: false, error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 router.get('/test-ping', (req, res) => {
   console.log('[AUTH] Ping received');
@@ -132,69 +141,80 @@ router.post('/logout', async (req, res) => {
   return res.json({ success: true });
 });
 
-// Forgot Password - Send OTP
-router.post('/forgot-password', async (req, res, next) => {
+// 1. Forgot Password - Send OTP via Email (SendGrid)
+router.post('/forgot-password', forgotPasswordLimiter, async (req, res, next) => {
   try {
-    console.log('[AUTH] Forgot password request received');
     const { email } = req.body;
-    console.log('[AUTH] Email provided:', email);
-
     if (!email) {
-      console.log('[AUTH] Error: Email is missing');
       return res.status(400).json({ success: false, error: 'Email is required' });
     }
 
-    console.log('[AUTH] Searching for user:', email.toLowerCase());
-    const user = await User.findOne({ email: email.toLowerCase() }).populate('worker client');
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Find user by email
+    const user = await User.findOne({ email: normalizedEmail });
 
+    // Always return generic success to prevent user enumeration
+    // But only process if user exists
     if (!user) {
-      console.log('[AUTH] Error: User not found for email:', email);
-      return res.status(404).json({ success: false, error: 'User not found' });
+      console.log(`[AUTH] Forgot password attempt for non-existent email: ${normalizedEmail}`);
+      return res.json({ 
+        success: true, 
+        message: 'If the email exists, an OTP has been sent.' 
+      });
     }
 
-    console.log('[AUTH] Generating OTP for user:', user._id);
+    // Check if user is blocked (too many failed attempts)
+    const now = new Date();
+    if (user.resetOtpBlockedUntil && user.resetOtpBlockedUntil > now) {
+      const minutesLeft = Math.ceil((user.resetOtpBlockedUntil - now) / 60000);
+      return res.status(429).json({ 
+        success: false, 
+        error: `Too many failed attempts. Please try again in ${minutesLeft} minute(s).` 
+      });
+    }
+
+    // Rate limit per email: max 3 requests per hour
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    if (user.forgotPasswordLastRequestAt && user.forgotPasswordLastRequestAt > oneHourAgo) {
+      // Check request count
+      if (user.forgotPasswordRequestCount >= 3) {
+        return res.status(429).json({ 
+          success: false, 
+          error: 'Too many requests. Please try again later.' 
+        });
+      }
+      user.forgotPasswordRequestCount += 1;
+    } else {
+      // Reset counter if more than an hour has passed
+      user.forgotPasswordRequestCount = 1;
+    }
+    user.forgotPasswordLastRequestAt = now;
+
+    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpHash = await User.hashPassword(otp);
-    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-    // Rate limiting: check if last OTP was sent less than 1 minute ago
-    if (user.resetPasswordExpires && (user.resetPasswordExpires.getTime() - Date.now() > 4 * 60 * 1000)) {
-      return res.status(429).json({ success: false, error: 'Please wait before requesting another OTP' });
-    }
-
-    user.resetPasswordOTP = otpHash;
-    user.resetPasswordExpires = otpExpiry;
-
-    console.log('[AUTH] Saving user with hashed OTP...');
+    // Store hashed OTP with 10-minute expiry
+    user.resetOtpHash = otpHash;
+    user.resetOtpExpiresAt = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes
+    user.resetOtpAttempts = 0;
+    user.resetOtpBlockedUntil = null; // Clear any previous block
     await user.save();
-    console.log('[AUTH] User saved successfully');
 
     try {
-      let phone = null;
-      if (user.role === 'worker' && user.worker) {
-        phone = user.worker.whatsapp || user.worker.phone;
-      } else if (user.role === 'client' && user.client) {
-        phone = user.client.phone;
-      }
-
-      if (!phone) {
-        console.log('[AUTH] Error: No phone number found for user:', user._id);
-        return res.status(400).json({ success: false, error: 'No phone number found for this account. Please contact support.' });
-      }
-
-      console.log('[AUTH] Attempting to send WhatsApp OTP to:', phone);
-      await sendWhatsAppOTP(phone, otp);
-      console.log('[AUTH] WhatsApp OTP sent successfully');
-      return res.json({ success: true, message: 'OTP sent to your WhatsApp' });
+      // Send OTP via SendGrid
+      await sendResetOtpEmail(normalizedEmail, otp);
+      return res.json({ 
+        success: true, 
+        message: 'If the email exists, an OTP has been sent.' 
+      });
     } catch (err) {
-      console.error('[AUTH] WhatsApp send error:', err.message);
-      user.resetPasswordOTP = null;
-      user.resetPasswordExpires = null;
-      await user.save();
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to send OTP. Please try again later.',
-        debugDetails: err.message
+      console.error('[AUTH] Email send failed:', err.message);
+      // Don't reveal email send failure to prevent enumeration
+      return res.json({ 
+        success: true, 
+        message: 'If the email exists, an OTP has been sent.' 
       });
     }
   } catch (err) {
@@ -202,59 +222,118 @@ router.post('/forgot-password', async (req, res, next) => {
   }
 });
 
-// Verify OTP
-router.post('/verify-otp', async (req, res, next) => {
+// 2. Verify Reset OTP - Exchange for Reset Session Token
+router.post('/verify-reset-otp', async (req, res, next) => {
   try {
     const { email, otp } = req.body;
-    if (!email || !otp) return res.status(400).json({ success: false, error: 'Email and OTP are required' });
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, error: 'Email and OTP are required' });
+    }
 
-    const user = await User.findOne({
-      email: email.toLowerCase(),
-      resetPasswordExpires: { $gt: Date.now() }
-    });
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
 
-    if (!user || !user.resetPasswordOTP) {
+    if (!user || !user.resetOtpHash || !user.resetOtpExpiresAt) {
       return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
     }
 
-    const isMatch = await bcrypt.compare(otp, user.resetPasswordOTP);
+    // Check if OTP has expired
+    const now = new Date();
+    if (user.resetOtpExpiresAt < now) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+    }
+
+    // Check if user is blocked
+    if (user.resetOtpBlockedUntil && user.resetOtpBlockedUntil > now) {
+      const minutesLeft = Math.ceil((user.resetOtpBlockedUntil - now) / 60000);
+      return res.status(403).json({ 
+        success: false, 
+        error: `Too many failed attempts. Please try again in ${minutesLeft} minute(s).` 
+      });
+    }
+
+    // Check attempt limit (max 5 wrong tries)
+    if (user.resetOtpAttempts >= 5) {
+      // Block for 15 minutes
+      user.resetOtpBlockedUntil = new Date(now.getTime() + 15 * 60 * 1000);
+      await user.save();
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Too many failed attempts. Please request a new OTP.' 
+      });
+    }
+
+    // Verify OTP
+    const isMatch = await bcrypt.compare(otp, user.resetOtpHash);
     if (!isMatch) {
-      return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+      user.resetOtpAttempts += 1;
+      await user.save();
+      return res.status(400).json({ success: false, error: 'Invalid OTP' });
     }
 
-    return res.json({ success: true, message: 'OTP verified' });
+    // OTP is valid - Create reset session token
+    const resetSessionToken = crypto.randomBytes(32).toString('hex');
+    const resetSessionTokenHash = crypto.createHash('sha256').update(resetSessionToken).digest('hex');
+
+    // Store reset session token with 10-minute expiry
+    user.resetSessionTokenHash = resetSessionTokenHash;
+    user.resetSessionExpiresAt = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes
+    
+    // Clear OTP data
+    user.resetOtpHash = null;
+    user.resetOtpExpiresAt = null;
+    user.resetOtpAttempts = 0;
+    user.resetOtpBlockedUntil = null;
+    
+    await user.save();
+
+    return res.json({ 
+      success: true, 
+      resetSessionToken 
+    });
   } catch (err) {
     return next(err);
   }
 });
 
-// Reset Password
+// 3. Reset Password - Using Reset Session Token
 router.post('/reset-password', async (req, res, next) => {
   try {
-    const { email, otp, password } = req.body;
-    if (!email || !otp || !password) return res.status(400).json({ success: false, error: 'All fields are required' });
-
-    const user = await User.findOne({
-      email: email.toLowerCase(),
-      resetPasswordExpires: { $gt: Date.now() }
-    });
-
-    if (!user || !user.resetPasswordOTP) {
-      return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+    const { resetSessionToken, newPassword } = req.body;
+    if (!resetSessionToken || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Reset token and new password are required' });
     }
 
-    const isMatch = await bcrypt.compare(otp, user.resetPasswordOTP);
-    if (!isMatch) {
-      return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+    }
+
+    // Hash the provided token to compare with stored hash
+    const tokenHash = crypto.createHash('sha256').update(resetSessionToken).digest('hex');
+
+    // Find user by reset session token hash
+    const user = await User.findOne({ 
+      resetSessionTokenHash: tokenHash,
+      resetSessionExpiresAt: { $gt: new Date() } // Token must not be expired
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired reset token' });
     }
 
     // Update password
-    user.passwordHash = await User.hashPassword(password);
-    user.resetPasswordOTP = null;
-    user.resetPasswordExpires = null;
+    user.passwordHash = await User.hashPassword(newPassword);
+    
+    // Invalidate reset session
+    user.resetSessionTokenHash = null;
+    user.resetSessionExpiresAt = null;
+    
     await user.save();
 
-    return res.json({ success: true, message: 'Password reset successful' });
+    return res.json({ 
+      success: true, 
+      message: 'Password has been reset successfully' 
+    });
   } catch (err) {
     return next(err);
   }

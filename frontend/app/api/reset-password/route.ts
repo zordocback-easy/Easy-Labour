@@ -15,7 +15,10 @@ export async function POST(req: Request) {
         return NextResponse.json(data, { status: res.status });
     } catch (error: any) {
         console.error("Reset password proxy error:", error.message || error);
-        return NextResponse.json({ success: false, error: `Proxy error: ${error.message || 'Unknown'}` }, { status: 500 });
+        return NextResponse.json({
+            success: false,
+            error: `Connection failed: ${error.message || 'Unknown'}`
+        }, { status: 500 });
     }
 }
 

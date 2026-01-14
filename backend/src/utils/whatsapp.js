@@ -1,8 +1,28 @@
 const axios = require('axios');
 
 /**
+ * Normalizes phone numbers to Meta API requirements:
+ * - Removes non-digits
+ * - Replaces leading '0' with '92'
+ * - Removes leading '+'
+ * - Ensures final digits start with '92'
+ */
+const normalizePhone = (phone) => {
+  let cleaned = phone.replace(/\D/g, '');
+  if (cleaned.startsWith('0')) {
+    cleaned = '92' + cleaned.substring(1);
+  }
+  if (!cleaned.startsWith('92')) {
+    cleaned = '92' + cleaned;
+  }
+  // If it was already 92... but shorter than expected or something, 
+  // we just ensure it's digits only and starts with 92.
+  return cleaned;
+};
+
+/**
  * Sends a plain text OTP via WhatsApp using Meta WhatsApp Cloud API.
- * @param {string} phone - Recipient phone number in international format (e.g., 923001234567)
+ * @param {string} phone - Recipient phone number
  * @param {string} otp - The One-Time Password
  */
 const sendWhatsAppOTP = async (phone, otp) => {
@@ -14,10 +34,7 @@ const sendWhatsAppOTP = async (phone, otp) => {
     throw new Error('WhatsApp service not configured');
   }
 
-  // Basic phone number cleaning: remove '+', spaces, dashes
-  const cleanPhone = phone.replace(/\D/g, '');
-
-  // Use API v22.0
+  const cleanPhone = normalizePhone(phone);
   const url = `https://graph.facebook.com/v22.0/${phoneNumberId}/messages`;
 
   const payload = {
@@ -40,9 +57,12 @@ const sendWhatsAppOTP = async (phone, otp) => {
     return response.data;
   } catch (error) {
     const errorData = error.response ? error.response.data : error.message;
-    console.error('[WHATSAPP ERROR]', JSON.stringify(errorData, null, 2));
-    throw new Error('Failed to send WhatsApp message');
+    console.error('[WHATSAPP API ERROR]', JSON.stringify(errorData, null, 2));
+
+    // Unmask the real error for the backend to handle/log
+    const metaMessage = error.response?.data?.error?.message || error.message;
+    throw new Error(`WhatsApp API Error: ${metaMessage}`);
   }
 };
 
-module.exports = sendWhatsAppOTP;
+module.exports = { sendWhatsAppOTP, normalizePhone };

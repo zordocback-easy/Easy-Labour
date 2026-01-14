@@ -9,8 +9,17 @@ const UserSchema = new mongoose.Schema(
     role: { type: String, enum: ['worker', 'client', 'admin'], required: true },
     worker: { type: mongoose.Schema.Types.ObjectId, ref: 'Worker', default: null },
     client: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', default: null },
-    resetPasswordOTP: { type: String, default: null },
-    resetPasswordExpires: { type: Date, default: null }
+    // Reset password OTP fields
+    resetOtpHash: { type: String, default: null },
+    resetOtpExpiresAt: { type: Date, default: null },
+    resetOtpAttempts: { type: Number, default: 0 },
+    resetOtpBlockedUntil: { type: Date, default: null },
+    // Reset session token fields (after OTP verification)
+    resetSessionTokenHash: { type: String, default: null },
+    resetSessionExpiresAt: { type: Date, default: null },
+    // Rate limiting for forgot password requests
+    forgotPasswordLastRequestAt: { type: Date, default: null },
+    forgotPasswordRequestCount: { type: Number, default: 0 }
   },
   { timestamps: true }
 );

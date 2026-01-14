@@ -136,19 +136,8 @@ function createApp() {
 
   app.use(errorHandler);
 
-  // Connect to DB immediately
-  const mongo = process.env.MONGODB_URI;
-  if (mongo) {
-    connectDB(mongo)
-      .then(async () => {
-        await seedPackages();
-        await seedAdmin();
-      })
-      .catch(err => console.error('DB Connection Error:', err));
-  }
-
   return app;
 }
 
 const app = createApp();
-module.exports = app;
+module.exports = { app, createApp, seedPackages, seedAdmin };
