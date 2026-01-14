@@ -23,6 +23,47 @@ router.get('/test-ping', (req, res) => {
   res.json({ success: true, message: 'pong' });
 });
 
+// DEBUG: Get OTP for testing (only in development)
+router.get('/debug-otp/:email', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ success: false, error: 'Not available in production' });
+  }
+  
+  try {
+    const { email } = req.params;
+    const user = await User.findOne({ email: email.toLowerCase() });
+    
+    if (!user || !user.resetOtpHash) {
+      return res.json({ success: false, message: 'No OTP found for this email' });
+    }
+    
+    // Note: We can't decrypt the hash, but we can show when it expires
+    return res.json({
+      success: true,
+      email: user.email,
+      otpExpiresAt: user.resetOtpExpiresAt,
+      attempts: user.resetOtpAttempts,
+      blockedUntil: user.resetOtpBlockedUntil,
+      message: 'Check your backend console logs for the OTP (it\'s logged when generated in dev mode)'
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DEBUG: Test email configuration
+router.get('/test-email-config', async (req, res) => {
+  const config = {
+    sendgridApiKeySet: !!process.env.SENDGRID_API_KEY,
+    sendgridApiKeyLength: process.env.SENDGRID_API_KEY ? process.env.SENDGRID_API_KEY.length : 0,
+    emailFrom: process.env.EMAIL_FROM || 'NOT SET',
+    nodeEnv: process.env.NODE_ENV,
+    message: 'Check these values. SENDGRID_API_KEY should be set and EMAIL_FROM should be a verified email in SendGrid.'
+  };
+  
+  return res.json(config);
+});
+
 const registerClientSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email address'),
@@ -205,12 +246,18 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res, next) =>
     try {
       // Send OTP via SendGrid
       await sendResetOtpEmail(normalizedEmail, otp);
+      console.log(`[AUTH] OTP email sent successfully to ${normalizedEmail}`);
       return res.json({ 
         success: true, 
         message: 'If the email exists, an OTP has been sent.' 
       });
     } catch (err) {
       console.error('[AUTH] Email send failed:', err.message);
+      console.error('[AUTH] Full error:', err);
+      // Log the OTP for debugging (only in development)
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[AUTH] DEBUG - Generated OTP for ${normalizedEmail}: ${otp}`);
+      }
       // Don't reveal email send failure to prevent enumeration
       return res.json({ 
         success: true, 

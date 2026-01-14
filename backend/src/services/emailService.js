@@ -1,15 +1,32 @@
 const nodemailer = require('nodemailer');
 
 // Create SendGrid SMTP transporter
-const transporter = nodemailer.createTransport({
-  host: 'smtp.sendgrid.net',
-  port: 587,
-  secure: false, // true for 465, false for other ports
-  auth: {
-    user: 'apikey',
-    pass: process.env.SENDGRID_API_KEY
+// Note: transporter is created at module load, but we verify config in sendResetOtpEmail
+let transporter = null;
+
+function getTransporter() {
+  if (!transporter) {
+    const apiKey = process.env.SENDGRID_API_KEY;
+    if (!apiKey) {
+      console.error('[EMAIL] SENDGRID_API_KEY is not set. Email sending will fail.');
+    }
+    
+    transporter = nodemailer.createTransport({
+      host: 'smtp.sendgrid.net',
+      port: 587,
+      secure: false, // true for 465, false for other ports
+      auth: {
+        user: 'apikey',
+        pass: apiKey
+      },
+      // Add connection timeout
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000
+    });
   }
-});
+  return transporter;
+}
 
 /**
  * Sends a password reset OTP email via SendGrid
@@ -21,8 +38,15 @@ async function sendResetOtpEmail(to, otp) {
   const fromEmail = process.env.EMAIL_FROM || 'noreply@example.com';
   
   if (!process.env.SENDGRID_API_KEY) {
+    console.error('[EMAIL] SENDGRID_API_KEY is not set in environment variables');
     throw new Error('SENDGRID_API_KEY environment variable is not set');
   }
+
+  if (!fromEmail || fromEmail === 'noreply@example.com') {
+    console.warn('[EMAIL] EMAIL_FROM is not set or using default. Emails may fail to send.');
+  }
+
+  console.log(`[EMAIL] Attempting to send OTP email to: ${to} from: ${fromEmail}`);
 
   const mailOptions = {
     from: fromEmail,
@@ -71,11 +95,25 @@ This is an automated message. Please do not reply to this email.
   };
 
   try {
+    const transporter = getTransporter();
+    
+    // Verify transporter configuration
+    await transporter.verify();
+    console.log('[EMAIL] SMTP connection verified successfully');
+    
     const info = await transporter.sendMail(mailOptions);
-    console.log('[EMAIL] Password reset OTP sent successfully:', info.messageId);
+    console.log('[EMAIL] Password reset OTP sent successfully');
+    console.log('[EMAIL] Message ID:', info.messageId);
+    console.log('[EMAIL] Response:', info.response);
     return info;
   } catch (error) {
-    console.error('[EMAIL] Failed to send password reset OTP:', error);
+    console.error('[EMAIL] Failed to send password reset OTP');
+    console.error('[EMAIL] Error code:', error.code);
+    console.error('[EMAIL] Error command:', error.command);
+    console.error('[EMAIL] Error message:', error.message);
+    if (error.response) {
+      console.error('[EMAIL] SMTP Response:', error.response);
+    }
     throw new Error(`Failed to send email: ${error.message}`);
   }
 }
