@@ -39,6 +39,9 @@ async function sendResetOtpEmail(to, otp) {
   
   if (!process.env.SENDGRID_API_KEY) {
     console.error('[EMAIL] SENDGRID_API_KEY is not set in environment variables');
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SENDGRID_API_KEY missing in production');
+    }
     throw new Error('SENDGRID_API_KEY environment variable is not set');
   }
 
